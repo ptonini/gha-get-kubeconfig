@@ -7,34 +7,16 @@ inputs:
   vault_addr:
     description: ''
     required: false
-  vault_method:
-    description: ''
-    required: false
-  vault_path:
-    description: ''
-    required: false
-  vault_role:
+  vault_token:
     description: ''
     required: false
   vault_k8s_role_path:
-    description: ''
-    required: false
-  aws_role:
     description: ''
     required: false
   aws_region:
     description: ''
     required: false
   aws_eks_cluster:
-    description: ''
-    required: false
-  azure_client_id:
-    description: ''
-    required: false
-  azure_tenant_id:
-    description: ''
-    required: false
-  azure_subscription_id:
     description: ''
     required: false
   azure_resource_group:
@@ -51,29 +33,16 @@ runs:
       if: inputs.kubeconfig_source == 'vault'
       with:
         url: ${{ inputs.vault_addr }}
-        method: ${{ inputs.vault_method }}
-        path: ${{ inputs.vault_path }}
-        role: ${{ inputs.vault_role }}
+        token: ${{ inputs.vault_token }}
         secrets: ${{ inputs.vault_k8s_role_path }} kube_config | KUBECONFIG_CONTENT;
     - run: echo "${KUBECONFIG_CONTENT}" > ${KUBECONFIG} && chmod 0600 ${KUBECONFIG}
       if: inputs.kubeconfig_source == 'vault'
       shell: bash
     # AWS EKS
-    - uses: aws-actions/configure-aws-credentials@v4
-      if: inputs.kubeconfig_source == 'aws'
-      with:
-        role-to-assume: ${{ inputs.aws_role }}
-        aws-region: ${{ inputs.aws_region }}
     - run: aws eks update-kubeconfig --region ${{ inputs.aws_region }} --name ${{ inputs.aws_eks_cluster }}
       if: inputs.kubeconfig_source == 'aws'
       shell: bash
     # Azure AKS
-    - uses: azure/login@v1
-      if: inputs.kubeconfig_source == 'azure'
-      with:
-        client-id: ${{ inputs.azure_client_id }}
-        tenant-id: ${{ inputs.azure_tenant_id }}
-        subscription-id: ${{ inputs.azure_subscription_id }}
     - uses: azure/aks-set-context@v3
       if: inputs.kubeconfig_source == 'azure'
       with:
@@ -81,5 +50,5 @@ runs:
         resource-group: ${{ inputs.azure_resource_group }}
         cluster-name: ${{ inputs.azure_aks_cluster }}
     # Verify credentials
-    - run: kubectl get svc
+    - run: kubectl get svc > /dev/null
       shell: bash
