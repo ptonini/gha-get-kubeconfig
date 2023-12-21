@@ -1,54 +1,76 @@
 name: get-kubeconfig
 description: ''
 inputs:
+  cluster_name:
+    description: ''
+    required: true
   kubeconfig_source:
     description: ''
     required: true
+  kubeconfig_template:
+    description: ''
+    required: false
+    default: |
+      apiVersion: v1
+      kind: Config
+      current-context: default
+      clusters:
+        - name: cluster
+          cluster:
+            certificate-authority-data: ${KUBERNETES_CA_CERT}
+            server: ${KUBERNETES_HOST}
+      users:
+        - name: user
+          user:
+            token: ${SERVICE_ACCOUNT_TOKEN}
+      contexts:
+        - name: default
+          context:
+            cluster: cluster
+            user: user
+            namespace: default
   vault_addr:
     description: ''
     required: false
-  vault_token:
+  vault_kubernetes_backend_prefix:
     description: ''
+    default: kubernetes
     required: false
-  vault_k8s_role_path:
+  vault_kubernetes_role:
     description: ''
+    default: deployer
     required: false
   aws_region:
-    description: ''
-    required: false
-  aws_eks_cluster:
     description: ''
     required: false
   azure_resource_group:
     description: ''
     required: false
-  azure_aks_cluster:
-    description: ''
-    required: false
+
 runs:
   using: composite
   steps:
-    # Hashicorp Vault
-    - uses: hashicorp/vault-action@v2
-      if: inputs.kubeconfig_source == 'vault'
-      with:
-        url: ${{ inputs.vault_addr }}
-        token: ${{ inputs.vault_token }}
-        secrets: ${{ inputs.vault_k8s_role_path }} kube_config | KUBECONFIG_CONTENT;
-    - run: echo "${KUBECONFIG_CONTENT}" > ${KUBECONFIG} && chmod 0600 ${KUBECONFIG}
-      if: inputs.kubeconfig_source == 'vault'
+    # AWS EKS #################################################################
+    - if: inputs.kubeconfig_source == 'aws'
+      run: aws eks update-kubeconfig --region ${{ inputs.aws_region }} --name ${{ inputs.cluster_name }} --admin
       shell: bash
-    # AWS EKS
-    - run: aws eks update-kubeconfig --region ${{ inputs.aws_region }} --name ${{ inputs.aws_eks_cluster }}
-      if: inputs.kubeconfig_source == 'aws'
-      shell: bash
-    # Azure AKS
-    - uses: azure/aks-set-context@v3
-      if: inputs.kubeconfig_source == 'azure'
+
+    # Azure AKS ###############################################################
+    - if: inputs.kubeconfig_source == 'azure'
+      uses: azure/aks-set-context@v3
       with:
         admin: true
         resource-group: ${{ inputs.azure_resource_group }}
-        cluster-name: ${{ inputs.azure_aks_cluster }}
-    # Verify credentials
+        cluster-name: ${{ inputs.cluster_name }}
+
+    # Hashicorp Vault ########################################################
+    - if: inputs.kubeconfig_source == 'vault'
+      uses: ptonini/gha-get-kubeconfig-from-vault@main
+      with:
+        vault_addr: ${{ vars.vault_addr }}
+        vault_kubernetes_backend: ${{ inputs.vault_kubernetes_backend_prefix }}/${{ inputs.cluster_name }}
+        vault_kubernetes_role: ${{ inputs.vault_kubernetes_role }}
+
+    # Verify credentials ######################################################
     - run: kubectl get svc > /dev/null
       shell: bash
