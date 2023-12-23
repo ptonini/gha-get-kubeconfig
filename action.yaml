@@ -67,7 +67,7 @@ runs:
     - if: inputs.kubeconfig_source == 'vault'
       uses: ptonini/gha-get-kubeconfig-from-vault@main
       with:
-        vault_addr: ${{ vars.vault_addr }}
+        vault_addr: ${{ inputs.vault_addr }}
         vault_kubernetes_backend: ${{ inputs.vault_kubernetes_backend_prefix }}/${{ inputs.cluster_name }}
         vault_kubernetes_role: ${{ inputs.vault_kubernetes_role }}
 
